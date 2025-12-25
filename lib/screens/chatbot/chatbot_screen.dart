@@ -12,22 +12,36 @@ class ChatbotScreen extends StatefulWidget {
 class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _messageController = TextEditingController();
   final List<({String message, bool isUser})> _messages = [];
+
   late final GenerativeModel _model;
+  late final ChatSession _chat;
+
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _model = FirebaseAI.vertexAI(
-      auth: FirebaseAuth.instance,
-    ).generativeModel(model: 'gemini-pro');
+
+    _model = FirebaseAI.vertexAI(auth: FirebaseAuth.instance).generativeModel(
+      model: 'gemini-ultra',
+      systemInstruction: Content.text(
+        'You are a helpful assistant. Keep responses concise.',
+      ),
+    );
+
+    // IMPORTANT: use a chat session for context
+    _chat = _model.startChat();
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
   }
 
   Future<void> _sendMessage() async {
-    final message = _messageController.text;
-    if (message.isEmpty) {
-      return;
-    }
+    final message = _messageController.text.trim();
+    if (message.isEmpty || _isLoading) return;
 
     setState(() {
       _messages.add((message: message, isUser: true));
@@ -36,52 +50,68 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
     _messageController.clear();
 
-    GenerateContentResponse? response = await _model.generateContent([
-      Content.text(message),
-    ]);
+    try {
+      final response = await _chat.sendMessage(
+        Content.text(message),
+      );
 
-    if (response.promptFeedback != null) {
       setState(() {
-        _messages.add((message: response.text ?? 'No response', isUser: false));
-        _isLoading = false;
+        _messages.add((
+          message: response.text ?? 'No response from AI',
+          isUser: false,
+        ));
       });
-    } else {
+    } catch (e) {
+      debugPrint(e.toString());
       setState(() {
-        _isLoading = false;
+        _messages.add((
+          message: 'Something went wrong. Try again.',
+          isUser: false,
+        ));
       });
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Chatbot')),
       body: Column(
         children: [
           Expanded(
             child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
+
                 return Align(
                   alignment: message.isUser
                       ? Alignment.centerRight
                       : Alignment.centerLeft,
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    constraints: const BoxConstraints(maxWidth: 320),
                     decoration: BoxDecoration(
                       color: message.isUser
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.secondary,
+                          ? colorScheme.primary
+                          : colorScheme.secondaryContainer,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
                       message.message,
                       style: TextStyle(
                         color: message.isUser
-                            ? Theme.of(context).colorScheme.onPrimary
-                            : Theme.of(context).colorScheme.onSecondary,
+                            ? colorScheme.onPrimary
+                            : colorScheme.onSecondaryContainer,
                       ),
                     ),
                   ),
@@ -89,18 +119,21 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               },
             ),
           ),
+
           if (_isLoading)
             const Padding(
-              padding: EdgeInsets.all(8.0),
+              padding: EdgeInsets.all(8),
               child: CircularProgressIndicator(),
             ),
+
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(8),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _messageController,
+                    textInputAction: TextInputAction.send,
                     decoration: const InputDecoration(
                       hintText: 'Type a message...',
                     ),
@@ -109,7 +142,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
+                  onPressed: _isLoading ? null : _sendMessage,
                 ),
               ],
             ),

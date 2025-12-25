@@ -30,6 +30,7 @@ class ThemeProvider with ChangeNotifier {
   }
 }
 
+GlobalKey<NavigatorState>? navigatorKey = GlobalKey();
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -75,6 +76,7 @@ class MyApp extends StatelessWidget {
       builder: (context, themeProvider, child) {
         return MaterialApp(
           title: 'ChatBot',
+          navigatorKey: navigatorKey,
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: themeProvider.themeMode,

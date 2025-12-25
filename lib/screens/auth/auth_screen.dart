@@ -1,15 +1,16 @@
 
 import 'package:flutter/material.dart';
+import 'package:myapp/main.dart';
 import 'package:myapp/services/auth_service.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
   @override
-  _AuthScreenState createState() => _AuthScreenState();
+  AuthScreenState createState() => AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class AuthScreenState extends State<AuthScreen> {
   final AuthService _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
   String _email = '';
@@ -33,10 +34,10 @@ class _AuthScreenState extends State<AuthScreen> {
           await _authService.signUpWithEmailAndPassword(_email.trim(), _password.trim());
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(navigatorKey?.currentState?.context??context).showSnackBar(
           SnackBar(
             content: Text(e.toString()),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: Theme.of(navigatorKey?.currentState?.context??context).colorScheme.error,
           ),
         );
         setState(() {
